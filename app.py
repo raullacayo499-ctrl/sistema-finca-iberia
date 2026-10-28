@@ -6,6 +6,11 @@ import os
 
 app = Flask(__name__)
 
+# Rutas explícitas para que Render encuentre todo
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+app.template_folder = os.path.join(BASE_DIR, 'templates')
+app.static_folder = os.path.join(BASE_DIR, 'static')
+
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Clave secreta (cámbiala por una propia si quieres)
