@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Animales - Finca</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>🐄 Registro de Animales de la Finca</h1>
+        {% if usuario.is_authenticated %}
+            <span>Bienvenido, {{ usuario.usuario }}</span>
+            <a href="/logout" class="btn-salir">Cerrar sesión</a>
+        {% endif %}
+    </header>
+
+    {% if not usuario.is_authenticated %}
+    <div class="login-contenedor">
+        <form method="POST" action="/login" class="form-login">
+            <h2>Iniciar Sesión</h2>
+            {% if error %}<p class="error">{{ error }}</p>{% endif %}
+            <input type="text" name="usuario" placeholder="Usuario" required>
+            <input type="password" name="contrasena" placeholder="Contraseña" required>
+            <button type="submit">Entrar</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="contenedor-principal">
+        <div class="panel-lista">
+            <div class="buscador">
+                <input type="text" id="buscar" placeholder="🔍 Buscar por nombre, número, dueño o raza...">
+            </div>
+            <button class="btn-agregar" onclick="mostrarFormulario()">➕ Agregar Animal</button>
+            <div id="lista-animales"></div>
+        </div>
+
+        <div class="panel-datos" id="panel-datos">
+            <p class="mensaje-seleccion">Selecciona un animal para ver sus datos</p>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-contenido">
+            <span class="cerrar" onclick="cerrarModal()">&times;</span>
+            <h2 id="titulo-modal">Agregar Animal</h2>
+            <form id="form-animal" enctype="multipart/form-data">
+                <input type="hidden" id="animal-id">
+                <div class="grid-campos">
+                    <div><label>Nombre:</label><input type="text" id="nombre" required></div>
+                    <div><label>Número / Identificación:</label><input type="text" id="numero" required></div>
+                    <div><label>Dueño:</label><input type="text" id="dueno"></div>
+                    <div><label>Peso (kg):</label><input type="number" step="0.01" id="peso"></div>
+                    <div><label>Raza:</label><input type="text" id="raza"></div>
+                    <div><label>Color:</label><input type="text" id="color"></div>
+                    <div><label>Madre:</label><input type="text" id="madre"></div>
+                    <div><label>Padre:</label><input type="text" id="padre"></div>
+                </div>
+                <div><label>Observaciones:</label><textarea id="observaciones" rows="3"></textarea></div>
+                <div><label>Imagen / Foto:</label><input type="file" id="imagen" accept="image/*"></div>
+                <div class="botones-form">
+                    <button type="submit" class="btn-guardar">Guardar</button>
+                    <button type="button" class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', cargarLista);
+        document.getElementById('buscar').addEventListener('keyup', cargarLista);
+
+        async function cargarLista() {
+            const q = document.getElementById('buscar').value;
+            const res = await fetch(`/api/animales?q=${encodeURIComponent(q)}`);
+            const animales = await res.json();
+            const lista = document.getElementById('lista-animales');
+            lista.innerHTML = '';
+            if (animales.length === 0) {
+                lista.innerHTML = '<p class="sin-resultados">No se encontraron animales</p>';
+                return;
+            }
+            animales.forEach(a => {
+                const div = document.createElement('div');
+                div.className = 'item-animal';
+                div.onclick = () => verAnimal(a.id);
+                div.innerHTML = `<strong>${a.nombre || 'Sin nombre'}</strong><span class="numero">${a.numero}</span>`;
+                lista.appendChild(div);
+            });
+        }
+
+        async function verAnimal(id) {
+            const res = await fetch(`/api/animal/${id}`);
+            const a = await res.json();
+            const panel = document.getElementById('panel-datos');
+            panel.innerHTML = `
+                <div class="encabezado-datos">
+                    <img src="/static/uploads/${a.imagen}" alt="${a.nombre}" class="foto-animal" onerror="this.src='https://via.placeholder.com/200?text=Sin+Foto'">
+                    <div class="acciones">
+                        <button class="btn-editar" onclick="editarAnimal(${a.id})">✏️ Editar</button>
+                        <button class="btn-eliminar" onclick="confirmarEliminar(${a.id})">🗑️ Eliminar</button>
+                    </div>
+                </div>
+                <div class="campos-datos">
+                    <p><strong>Nombre:</strong> ${a.nombre || '-'}</p>
+                    <p><strong>Número:</strong> ${a.numero}</p>
+                    <p><strong>Dueño:</strong> ${a.dueno || '-'}</p>
+                    <p><strong>Peso:</strong> ${a.peso || '-'} kg</p>
+                    <p><strong>Raza:</strong> ${a.raza || '-'}</p>
+                    <p><strong>Color:</strong> ${a.color || '-'}</p>
+                    <p><strong>Madre:</strong> ${a.madre || '-'}</p>
+                    <p><strong>Padre:</strong> ${a.padre || '-'}</p>
+                    <p><strong>Observaciones:</strong> ${a.observaciones || '-'}</p>
+                </div>
+            `;
+        }
+
+        function mostrarFormulario() {
+            document.getElementById('titulo-modal').textContent = 'Agregar Animal';
+            document.getElementById('animal-id').value = '';
+            document.getElementById('form-animal').reset();
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        function editarAnimal(id) {
+            fetch(`/api/animal/${id}`).then(r => r.json()).then(a => {
+                document.getElementById('titulo-modal').textContent = 'Editar Animal';
+                document.getElementById('animal-id').value = a.id;
+                document.getElementById('nombre').value = a.nombre || '';
+                document.getElementById('numero').value = a.numero;
+                document.getElementById('dueno').value = a.dueno || '';
+                document.getElementById('peso').value = a.peso || '';
+                document.getElementById('raza').value = a.raza || '';
+                document.getElementById('color').value = a.color || '';
+                document.getElementById('madre').value = a.madre || '';
+                document.getElementById('padre').value = a.padre || '';
+                document.getElementById('observaciones').value = a.observaciones || '';
+                document.getElementById('modal').style.display = 'block';
+            });
+        }
+
+        function cerrarModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        async function confirmarEliminar(id) {
+            if (!confirm('¿Eliminar este animal?')) return;
+            await fetch(`/api/eliminar/${id}`, {method: 'POST'});
+            document.getElementById('panel-datos').innerHTML = '<p class="mensaje-seleccion">Animal eliminado. Selecciona otro.</p>';
+            cargarLista();
+        }
+
+        document.getElementById('form-animal').addEventListener('submit', async e => {
+            e.preventDefault();
+            const id = document.getElementById('animal-id').value;
+            const datos = new FormData();
+            datos.append('nombre', document.getElementById('nombre').value);
+            datos.append('numero', document.getElementById('numero').value);
+            datos.append('dueno', document.getElementById('dueno').value);
+            datos.append('peso', document.getElementById('peso').value);
+            datos.append('raza', document.getElementById('raza').value);
+            datos.append('color', document.getElementById('color').value);
+            datos.append('madre', document.getElementById('madre').value);
+            datos.append('padre', document.getElementById('padre').value);
+            datos.append('observaciones', document.getElementById('observaciones').value);
+            const foto = document.getElementById('imagen').files[0];
+            if (foto) datos.append('imagen', foto);
+
+            const url = id ? `/api/editar/${id}` : '/api/agregar';
+            await fetch(url, {method: 'POST', body: datos});
+            cerrarModal();
+            cargarLista();
+        });
+    </script>
+</body>
+</html>
